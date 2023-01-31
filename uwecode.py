@@ -1,8 +1,7 @@
-tokens = ("VAR", "MIDVAR", "AT", "COLONEQUALS", "ARROW", "LPAREN", "RPAREN", "STRINGLIT")
+tokens = ("VAR", "MIDVAR", "COLONEQUALS", "ARROW", "LPAREN", "RPAREN", "STRINGLIT")
 
-t_VAR = r'[a-zA-Z0-9\!\#\$\%\^\&\*\+\=\_\|\;\'\<\>\,\.\/\?]+'
-t_MIDVAR = r'`[a-zA-Z0-9\!\#\$\%\^\&\*\+\=\_\|\;\'\<\>\,\.\/\?]+'
-t_AT = r'\@'
+t_VAR = r'[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\;\'\<\>\,\.\/\?]+'
+t_MIDVAR = r'`[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\;\'\<\>\,\.\/\?]+'
 t_COLONEQUALS = r':='
 t_ARROW = r'->'
 t_LPAREN = r'\('
@@ -25,8 +24,6 @@ def t_error(t):
 
 import ply.lex as lex
 lexer = lex.lex()
-
-precedence = (("right","ARROW"), ("right","MIDVAR"), ("left", "AT"))
 
 # expression: lambda map from var to value: lambda: lambda fn arg: ret val
 # values in map already have map applied to it, and are thunks
@@ -52,37 +49,15 @@ def fnCall(f,x):
   return thunkify(lambda: (f())(x))
 
 def p_statement_assign(t):
-  'statement : VAR COLONEQUALS expression'
+  'statement : VAR COLONEQUALS lvl1expr'
   t1 = t[1]
   t3 = t[3]
   def t0(m):
     m[t1] = t3(m)
   t[0] = t0
 
-def p_expression_var(t):
-  'expression : VAR'
-  t1 = t[1]
-  t[0] = lambda m: m[t1]
-
-def p_expression_midapp(t):
-  'expression : expression MIDVAR expression'
-  t1 = t[1]
-  t2 = t[2]
-  t3 = t[3]
-  t[0] = lambda m: fnCall(fnCall(m[t2[1:]],t1(m)),t3(m))
-
-def p_expression_app(t):
-  'expression : expression AT expression'
-  t1 = t[1]
-  t3 = t[3]
-  t[0] = lambda m: fnCall(t1(m),t3(m))
-
-def p_expression_parens(t):
-  'expression : LPAREN expression RPAREN'
-  t[0] = t[2]
-
-def p_expression_lam(t):
-  'expression : VAR ARROW expression'
+def p_lvl1expr_lam(t):
+  'lvl1expr : VAR ARROW lvl1expr'
   t1 = t[1]
   t3 = t[3]
   def t0(m, x):
@@ -91,8 +66,42 @@ def p_expression_lam(t):
     return t3(m2)
   t[0] = lambda m: lambda: lambda x: t0(m,x)
 
-def p_expression_string(t):
-  'expression : STRINGLIT'
+def p_lvl1expr_lvl2expr(t):
+  'lvl1expr : lvl2expr'
+  t[0] = t[1]
+
+def p_lvl2expr_midapp(t):
+  'lvl2expr : lvl3expr MIDVAR lvl2expr'
+  t1 = t[1]
+  t2 = t[2]
+  t3 = t[3]
+  t[0] = lambda m: fnCall(fnCall(m[t2[1:]],t1(m)),t3(m))
+
+def p_lvl2expr_lvl3expr(t):
+  'lvl2expr : lvl3expr'
+  t[0] = t[1]
+
+def p_lvl3expr_app(t):
+  'lvl3expr : lvl3expr lvl4expr'
+  t1 = t[1]
+  t2 = t[2]
+  t[0] = lambda m: fnCall(t1(m),t2(m))
+
+def p_lvl3expr_lvl4expr(t):
+  'lvl3expr : lvl4expr'
+  t[0] = t[1]
+
+def p_lvl4expr_var(t):
+  'lvl4expr : VAR'
+  t1 = t[1]
+  t[0] = lambda m: m[t1]
+
+def p_lvl4expr_parens(t):
+  'lvl4expr : LPAREN lvl1expr RPAREN'
+  t[0] = t[2]
+
+def p_lvl4expr_string(t):
+  'lvl4expr : STRINGLIT'
   t1 = t[1]
   t[0] = lambda m: lambda: t1[1:-1]
 
@@ -102,7 +111,7 @@ def p_error(t):
 import ply.yacc as yacc
 parser = yacc.yacc()
 
-s = "f := q -> q @ \"asdf\""
+s = "f := q -> q \"asdf\""
 parsed = parser.parse(s)
 m = {}
 parsed(m)
