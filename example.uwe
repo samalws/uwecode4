@@ -14,4 +14,4 @@ main :=
     or ->
     not ->
     boolToTerm ->
-  "lol" `= "lmao"
+  "lol" `= "lmao";

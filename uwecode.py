@@ -1,7 +1,8 @@
-tokens = ("VAR", "MIDVAR", "COLONEQUALS", "ARROW", "LPAREN", "RPAREN", "STRINGLIT")
+tokens = ("VAR", "MIDVAR", "SEMI", "COLONEQUALS", "ARROW", "LPAREN", "RPAREN", "STRINGLIT")
 
-t_VAR = r'[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\;\'\<\>\,\.\/\?]+'
-t_MIDVAR = r'`[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\;\'\<\>\,\.\/\?]+'
+t_VAR = r'[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\'\<\>\,\.\/\?]+'
+t_MIDVAR = r'`[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\'\<\>\,\.\/\?]+'
+t_SEMI = r';'
 t_COLONEQUALS = r':='
 t_ARROW = r'->'
 t_LPAREN = r'\('
@@ -47,6 +48,14 @@ def thunkify(exprLambda):
 
 def fnCall(f,x):
   return thunkify(lambda: (f())(x))
+
+def p_code_null(t):
+  'code : '
+  t[0] = []
+
+def p_code_cons(t):
+  'code : statement SEMI code'
+  t[0] = [t[1]] + t[3]
 
 def p_statement_assign(t):
   'statement : VAR COLONEQUALS lvl1expr'
@@ -114,7 +123,7 @@ parser = yacc.yacc()
 def strToTerm(s): # TODO do exprs instead of stmts
   parsed = parser.parse(s)
   m = {}
-  parsed(m)
+  for defn in parsed: defn(m)
   return m["main"]()
 
 def fnToTerm(f):
@@ -138,7 +147,7 @@ toFeed = [
   twoFnToTerm(lambda n, m: n and m),
   twoFnToTerm(lambda n, m: n or m),
   fnToTerm(lambda n: not n),
-  fnToTerm(lambda n: strToTerm("main := x -> y -> " + ("x" if n else "y"))),
+  fnToTerm(lambda n: strToTerm("main := x -> y -> " + ("x;" if n else "y;"))),
 ]
 
 def runCode(code):
