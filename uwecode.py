@@ -111,8 +111,40 @@ def p_error(t):
 import ply.yacc as yacc
 parser = yacc.yacc()
 
-s = "f := q -> q \"asdf\""
-parsed = parser.parse(s)
-m = {}
-parsed(m)
-print(m["f"]()(lambda: lambda x: x()[1:])())
+def strToTerm(s): # TODO do exprs instead of stmts
+  parsed = parser.parse(s)
+  m = {}
+  parsed(m)
+  return m["main"]()
+
+def fnToTerm(f):
+  return lambda: lambda x: f(x())
+
+def twoFnToTerm(f):
+  return lambda: lambda x: lambda y: f(x(),y())
+
+toFeed = [
+  lambda: true,
+  lambda: false,
+  fnToTerm(lambda s: int(s)),
+  twoFnToTerm(lambda n, m: n+m),
+  twoFnToTerm(lambda n, m: n*m),
+  twoFnToTerm(lambda n, m: n**m),
+  twoFnToTerm(lambda n, m: n/m),
+  twoFnToTerm(lambda n, m: n//m),
+  twoFnToTerm(lambda n, m: n % m),
+  twoFnToTerm(lambda n, m: n == m),
+  twoFnToTerm(lambda n, m: n < m),
+  twoFnToTerm(lambda n, m: n and m),
+  twoFnToTerm(lambda n, m: n or m),
+  fnToTerm(lambda n: not n),
+  fnToTerm(lambda n: strToTerm("main := x -> y -> " + ("x" if n else "y"))),
+]
+
+def runCode(code):
+  main = strToTerm(code)
+  for feed in toFeed:
+    main = main(feed)()
+  print(main)
+
+runCode(open("example.uwe","r").read())

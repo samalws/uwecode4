@@ -1,0 +1,17 @@
+main :=
+    true ->
+    false ->
+    atoi ->
+    + ->
+    * ->
+    ** ->
+    / ->
+    // ->
+    % ->
+    = ->
+    < ->
+    and ->
+    or ->
+    not ->
+    boolToTerm ->
+  "lol" `= "lmao"
