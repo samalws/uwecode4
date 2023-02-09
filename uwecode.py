@@ -58,21 +58,25 @@ def p_code_cons(t):
   t[0] = [t[1]] + t[3]
 
 def p_statement_assign(t):
-  'statement : VAR COLONEQUALS lvl1expr'
+  'statement : VAR COLONEQUALS expr'
   t1 = t[1]
   t3 = t[3]
   def t0(m):
     m[t1] = t3(m)
   t[0] = t0
 
+def p_expr(t):
+  'expr : lvl1expr'
+  t[0] = t[1]
+
 def p_lvl1expr_lam(t):
-  'lvl1expr : VAR ARROW lvl1expr'
+  'lvl1expr : VAR ARROW expr'
   t1 = t[1]
   t3 = t[3]
   def t0(m, x):
     m2 = m.copy()
     m2[t1] = x
-    return t3(m2)
+    return t3(m2)()
   t[0] = lambda m: lambda: lambda x: t0(m,x)
 
 def p_lvl1expr_lvl2expr(t):
@@ -106,7 +110,7 @@ def p_lvl4expr_var(t):
   t[0] = lambda m: m[t1]
 
 def p_lvl4expr_parens(t):
-  'lvl4expr : LPAREN lvl1expr RPAREN'
+  'lvl4expr : LPAREN expr RPAREN'
   t[0] = t[2]
 
 def p_lvl4expr_string(t):
@@ -115,16 +119,21 @@ def p_lvl4expr_string(t):
   t[0] = lambda m: lambda: t1[1:-1]
 
 def p_error(t):
-  print("Syntax error at " + t.value)
+  print(str(t.lineno) + ": Syntax error at " + t.value)
+  exit(1)
 
 import ply.yacc as yacc
-parser = yacc.yacc()
+parseCode = yacc.yacc(start="code")
+parseExpr = yacc.yacc(start="expr")
 
-def strToTerm(s): # TODO do exprs instead of stmts
-  parsed = parser.parse(s)
+def codeStrToTerm(s): # TODO do exprs instead of stmts
+  parsed = parseCode.parse(s)
   m = {}
   for defn in parsed: defn(m)
   return m["main"]()
+
+def exprStrToTerm(s):
+  return parseExpr.parse(s)({})
 
 def fnToTerm(f):
   return lambda: lambda x: f(x())
@@ -133,8 +142,8 @@ def twoFnToTerm(f):
   return lambda: lambda x: lambda y: f(x(),y())
 
 toFeed = [
-  lambda: true,
-  lambda: false,
+  lambda: True,
+  lambda: False,
   fnToTerm(lambda s: int(s)),
   twoFnToTerm(lambda n, m: n+m),
   twoFnToTerm(lambda n, m: n*m),
@@ -147,13 +156,13 @@ toFeed = [
   twoFnToTerm(lambda n, m: n and m),
   twoFnToTerm(lambda n, m: n or m),
   fnToTerm(lambda n: not n),
-  fnToTerm(lambda n: strToTerm("main := x -> y -> " + ("x;" if n else "y;"))),
+  fnToTerm(lambda n: exprStrToTerm("x -> y -> " + ("x" if n else "y"))()),
 ]
 
 def runCode(code):
-  main = strToTerm(code)
+  main = codeStrToTerm(code)
   for feed in toFeed:
-    main = main(feed)()
+    main = main(feed)
   print(main)
 
 runCode(open("example.uwe","r").read())

@@ -1,3 +1,5 @@
+foo := = -> "lol" `= "lmao";
+bar := a -> b -> a b "is true" "is false";
 main :=
     true ->
     false ->
@@ -14,4 +16,4 @@ main :=
     or ->
     not ->
     boolToTerm ->
-  "lol" `= "lmao";
+  bar boolToTerm (foo =);
