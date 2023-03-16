@@ -142,21 +142,21 @@ def twoFnToTerm(f):
   return lambda: lambda x: lambda y: f(x(),y())
 
 toFeed = {
-  "true":       lambda: True,
-  "false":      lambda: False,
-  "atoi":       fnToTerm(lambda s: int(s)),
-  "+":          twoFnToTerm(lambda n, m: n+m),
-  "*":          twoFnToTerm(lambda n, m: n*m),
-  "**":         twoFnToTerm(lambda n, m: n**m),
-  "/":          twoFnToTerm(lambda n, m: n/m),
-  "//":         twoFnToTerm(lambda n, m: n//m),
-  "%":          twoFnToTerm(lambda n, m: n % m),
-  "=":          twoFnToTerm(lambda n, m: n == m),
-  "<":          twoFnToTerm(lambda n, m: n < m),
-  "and":        twoFnToTerm(lambda n, m: n and m),
-  "or":         twoFnToTerm(lambda n, m: n or m),
-  "not":        fnToTerm(lambda n: not n),
-  "boolToTerm": fnToTerm(lambda n: exprStrToTerm("x -> y -> " + ("x" if n else "y"))()),
+  "true":      lambda: True,
+  "false":     lambda: False,
+  "atoi":      fnToTerm(lambda s: int(s)),
+  "+":         twoFnToTerm(lambda n, m: n+m),
+  "*":         twoFnToTerm(lambda n, m: n*m),
+  "**":        twoFnToTerm(lambda n, m: n**m),
+  "/":         twoFnToTerm(lambda n, m: n/m),
+  "//":        twoFnToTerm(lambda n, m: n//m),
+  "%":         twoFnToTerm(lambda n, m: n % m),
+  "=":         twoFnToTerm(lambda n, m: n == m),
+  "<":         twoFnToTerm(lambda n, m: n < m),
+  "and":       twoFnToTerm(lambda n, m: n and m),
+  "or":        twoFnToTerm(lambda n, m: n or m),
+  "not":       fnToTerm(lambda n: not n),
+  "scottBool": fnToTerm(lambda n: exprStrToTerm("x -> y -> " + ("x" if n else "y"))()),
 }
 
 def runCode(code):

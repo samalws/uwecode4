@@ -1,3 +1,56 @@
-foo := = -> "lol" `= "lmao";
-bar := a -> b -> a b "is true" "is false";
-main := bar boolToTerm (foo =);
+[basics]
+id := a -> a;
+const := a -> b -> a;
+ignore := a -> b -> b;
+fix := g -> (x -> g (x x)) (x -> g (x x));
+compose := f -> g -> x -> f (g x);
+then := g -> f -> x -> f (g x);
+rev := x -> f -> f x;
+rev2 := x -> y -> f -> f x y;
+if := scottBool;
+
+[symbols]
+$ := id;
+. := compose;
+& := then;
+
+[maybe]
+just := a -> f -> x -> f a;
+nothing := f -> x -> x;
+fromMaybe := rev2 id;
+scottMaybe := id;
+
+[tuple]
+tup := x -> y -> f -> f x y;
+fst := rev const;
+snd := rev ignore;
+scottTuple := id;
+
+[either]
+left := x -> f -> g -> f x;
+right := x -> f -> g -> g x;
+scottEither := id;
+leftToMaybe := rev2 just (const nothing);
+rightToMaybe := rev2 (const nothing) just;
+fromLeft := leftToMaybe `& fromMaybe "FAIL";
+fromRight := rightToMaybe `& fromMaybe "FAIL";
+
+[list]
+null := f -> x -> x;
+cons := h -> t -> f -> x -> f h t;
+maybeHead := rev2 (h -> t -> just h) nothing;
+maybeTail := rev2 (h -> t -> just t) nothing;
+scottList := id;
+churchList := l -> f -> x -> fix (self -> l -> l (h -> t -> f h (self t)) x) l;
+
+[list functions, but independent of impl]
+head := maybeHead `& fromMaybe "FAIL";
+tail := maybeTail `& fromMaybe "FAIL";
+reduce := f -> x -> l -> churchList l f x;
+map := f -> reduce (f `& cons) null;
+filter := f -> reduce (h -> r -> if (f h) (cons h r) r) null;
+len := reduce (h -> r -> r `+ atoi "1") (atoi "0");
+sum := reduce + (atoi "0");
+prod := reduce * (atoi "1");
+
+main := prod `$ filter (x -> atoi "0" `< x) `$ map atoi `$ "5" `cons "6" `cons "-7" `cons null;
