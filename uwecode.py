@@ -126,9 +126,9 @@ import ply.yacc as yacc
 parseCode = yacc.yacc(start="code")
 parseExpr = yacc.yacc(start="expr")
 
-def codeStrToTerm(s): # TODO do exprs instead of stmts
+def codeStrToTerm(s,m={}):
   parsed = parseCode.parse(s)
-  m = {}
+  m = m.copy()
   for defn in parsed: defn(m)
   return m["main"]()
 
@@ -141,28 +141,26 @@ def fnToTerm(f):
 def twoFnToTerm(f):
   return lambda: lambda x: lambda y: f(x(),y())
 
-toFeed = [
-  lambda: True,
-  lambda: False,
-  fnToTerm(lambda s: int(s)),
-  twoFnToTerm(lambda n, m: n+m),
-  twoFnToTerm(lambda n, m: n*m),
-  twoFnToTerm(lambda n, m: n**m),
-  twoFnToTerm(lambda n, m: n/m),
-  twoFnToTerm(lambda n, m: n//m),
-  twoFnToTerm(lambda n, m: n % m),
-  twoFnToTerm(lambda n, m: n == m),
-  twoFnToTerm(lambda n, m: n < m),
-  twoFnToTerm(lambda n, m: n and m),
-  twoFnToTerm(lambda n, m: n or m),
-  fnToTerm(lambda n: not n),
-  fnToTerm(lambda n: exprStrToTerm("x -> y -> " + ("x" if n else "y"))()),
-]
+toFeed = {
+  "true":       lambda: True,
+  "false":      lambda: False,
+  "atoi":       fnToTerm(lambda s: int(s)),
+  "+":          twoFnToTerm(lambda n, m: n+m),
+  "*":          twoFnToTerm(lambda n, m: n*m),
+  "**":         twoFnToTerm(lambda n, m: n**m),
+  "/":          twoFnToTerm(lambda n, m: n/m),
+  "//":         twoFnToTerm(lambda n, m: n//m),
+  "%":          twoFnToTerm(lambda n, m: n % m),
+  "=":          twoFnToTerm(lambda n, m: n == m),
+  "<":          twoFnToTerm(lambda n, m: n < m),
+  "and":        twoFnToTerm(lambda n, m: n and m),
+  "or":         twoFnToTerm(lambda n, m: n or m),
+  "not":        fnToTerm(lambda n: not n),
+  "boolToTerm": fnToTerm(lambda n: exprStrToTerm("x -> y -> " + ("x" if n else "y"))()),
+}
 
 def runCode(code):
-  main = codeStrToTerm(code)
-  for feed in toFeed:
-    main = main(feed)
+  main = codeStrToTerm(code, toFeed)
   print(main)
 
 runCode(open("example.uwe","r").read())
