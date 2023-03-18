@@ -20,8 +20,8 @@ def t_comment(t):
   pass
 
 def t_error(t):
-  print("Illegal character " + t.value[0] + " at line " + t.lexer.lineno)
-  t.lexer.skip(1)
+  print("Illegal character " + t.value[0] + " at line " + str(t.lexer.lineno))
+  exit(1)
 
 import ply.lex as lex
 lexer = lex.lex()

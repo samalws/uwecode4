@@ -8,6 +8,9 @@ then := g -> f -> x -> f (g x);
 rev := x -> f -> f x;
 rev2 := x -> y -> f -> f x y;
 if := scottBool;
+let := rev;
+
+constN := fix (self -> n -> x -> if (n `= atoi "0") x (const `$ self (n `+ atoi "-1") x));
 
 [symbols]
 $ := id;
@@ -53,4 +56,49 @@ len := reduce (h -> r -> r `+ atoi "1") (atoi "0");
 sum := reduce + (atoi "0");
 prod := reduce * (atoi "1");
 
-main := prod `$ filter (x -> atoi "0" `< x) `$ map atoi `$ "5" `cons "6" `cons "-7" `cons null;
+[uwecode repr]
+[expr = lambda string expr | app expr expr | var string | str string | builtin a string appFn:(expr -> expr) subFn:(string -> expr -> expr) ]
+[decl = (string, expr)]
+lambda := s -> e -> f -> g -> h -> i -> j -> f s e;
+app := a -> b -> f -> g -> h -> i -> j -> g a b;
+var := s -> f -> g -> h -> i -> j -> h s;
+str := s -> f -> g -> h -> i -> j -> i s;
+builtin := a -> strRepr -> appFn -> subFn -> f -> g -> h -> i -> j -> j a strRepr appFn subFn;
+decl := tup;
+scottExpr := id;
+scottDecl := scottTuple;
+
+[assumes we're at the top level (no free variables when we start); assumption is untrue when you add global vars TODO]
+subst := var -> sub -> fix (self -> expr -> scottExpr expr
+  [lambda s e] (s -> e -> lambda s `$ if (var `= s) e (self e) )
+  [app a b] (a -> b -> self a `app self b)
+  [var s] (s -> if (var `= s) sub expr )
+  [str _] (const expr)
+  [builtin a strRepr appFn subFn] (a -> strRepr -> appFn -> subFn -> subFn var sub));
+
+stepExpr := fix (self -> expr -> scottExpr expr
+  [lambda _ _] (constN (atoi "2") `$ false `tup expr)
+  [app a b] (a -> b -> self a `let (aSimpl ->
+               if (fst aSimpl) (true `tup snd aSimpl `app b) (self b `let (bSimpl ->
+               if (fst bSimpl) (true `tup a `app snd bSimpl) ( scottExpr a
+                   [lambda s e] (s -> e -> true `tup subst s b e)
+                   [app _ _] (constN (atoi "2") `$ false `tup a `app b)
+                   [var _] (const `$ false `tup a `app b)
+                   [str _] (const `$ false `tup a `app b)
+                   [builtin x strRepr appFn subFn] (x -> strRepr -> appFn -> subFn -> true `tup appFn b))))))
+  [var _] (const `$ false `tup expr)
+  [str _] (const `$ false `tup expr)
+  [builtin _ _ _ _] (constN (atoi "4") `$ false `tup expr));
+
+fullyEvalExpr := fix (self -> expr -> stepExpr expr `let (simpl -> if (fst simpl) (self `$ snd simpl) (snd simpl)));
+
+printExpr := fix (self -> expr -> scottExpr expr
+  [lambda s e] (s -> e -> "(" `+ s `+ " -> " `+ self e `+ ")" )
+  [app a b] (a -> b -> "(" `+ self a `+ " " `+ self b `+ ")" )
+  [var s] (s -> s)
+  [str s] (s -> "'" `+ s `+ "'") [ TODO should be double quote and escaped once python is fixed ]
+  [builtin a strRepr appFn subFn] (a -> strRepr -> appFn -> subFn -> strRepr));
+
+exampleLambdaTerm := ((lambda "x" `$ var "x") `app (lambda "x" `$ lambda "y" `$ var "y")) `app (str "q");
+
+main := printExpr `$ fullyEvalExpr exampleLambdaTerm;
