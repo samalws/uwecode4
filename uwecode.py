@@ -26,28 +26,9 @@ def t_error(t):
 import ply.lex as lex
 lexer = lex.lex()
 
-# expression: lambda map from var to value: lambda: lambda fn arg: ret val
+# expression: lambda map from var to value: val
+# thunk: lambda: val
 # values in map already have map applied to it, and are thunks
-
-def thunkify(exprLambda):
-  tbl = { "status": 0, "result": None }
-  # status:
-  # 0: never evalled yet
-  # 1: in process of evalling
-  # 2: have a result
-  def retVal(tbl):
-    status = tbl["status"]
-    if status == 0:
-      status = 1
-      tbl["result"] = exprLambda()
-      tbl["status"] = 2
-    elif status == 1:
-      raise Exception("Infinite loop")
-    return tbl["result"]
-  return lambda: retVal(tbl)
-
-def fnCall(f,x):
-  return thunkify(lambda: (f())(x))
 
 def p_code_null(t):
   'code : '
@@ -76,8 +57,8 @@ def p_lvl1expr_lam(t):
   def t0(m, x):
     m2 = m.copy()
     m2[t1] = x
-    return t3(m2)()
-  t[0] = lambda m: lambda: lambda x: t0(m,x)
+    return t3(m2)
+  t[0] = lambda m: lambda x: t0(m,x)
 
 def p_lvl1expr_lvl2expr(t):
   'lvl1expr : lvl2expr'
@@ -88,7 +69,7 @@ def p_lvl2expr_midapp(t):
   t1 = t[1]
   t2 = t[2]
   t3 = t[3]
-  t[0] = lambda m: fnCall(fnCall(m[t2[1:]],t1(m)),t3(m))
+  t[0] = lambda m: (m[t2[1:]])(t1(m))(t3(m))
 
 def p_lvl2expr_lvl3expr(t):
   'lvl2expr : lvl3expr'
@@ -98,7 +79,7 @@ def p_lvl3expr_app(t):
   'lvl3expr : lvl3expr lvl4expr'
   t1 = t[1]
   t2 = t[2]
-  t[0] = lambda m: fnCall(t1(m),t2(m))
+  t[0] = lambda m: (t1(m))(t2(m))
 
 def p_lvl3expr_lvl4expr(t):
   'lvl3expr : lvl4expr'
@@ -116,7 +97,7 @@ def p_lvl4expr_parens(t):
 def p_lvl4expr_string(t):
   'lvl4expr : STRINGLIT'
   t1 = t[1]
-  t[0] = lambda m: lambda: t1[1:-1]
+  t[0] = lambda m: t1[1:-1]
 
 def p_error(t):
   print(str(t.lineno) + ": Syntax error at " + t.value)
@@ -124,39 +105,48 @@ def p_error(t):
 
 import ply.yacc as yacc
 parseCode = yacc.yacc(start="code")
-parseExpr = yacc.yacc(start="expr")
 
-def codeStrToTerm(s,m={}):
+def codeStrToTerm(s,m,mainFn="main"):
   parsed = parseCode.parse(s)
   m = m.copy()
   for defn in parsed: defn(m)
-  return m["main"]()
+  return m[mainFn]
 
-def exprStrToTerm(s):
-  return parseExpr.parse(s)({})
-
-def fnToTerm(f):
-  return lambda: lambda x: f(x())
-
-def twoFnToTerm(f):
-  return lambda: lambda x: lambda y: f(x(),y())
+def thunkify(exprLambda): # exprLambda: _ -> val
+  tbl = { "status": 0, "result": None }
+  # status:
+  # 0: never evalled yet
+  # 1: in process of evalling
+  # 2: have a result
+  def retVal(tbl):
+    status = tbl["status"]
+    if status == 0:
+      status = 1
+      tbl["result"] = exprLambda(())
+      tbl["status"] = 2
+    elif status == 1:
+      raise Exception("Infinite loop")
+    return tbl["result"]
+  return lambda: retVal(tbl)
 
 toFeed = {
-  "true":      lambda: True,
-  "false":     lambda: False,
-  "atoi":      fnToTerm(lambda s: int(s)),
-  "+":         twoFnToTerm(lambda n, m: n+m),
-  "*":         twoFnToTerm(lambda n, m: n*m),
-  "**":        twoFnToTerm(lambda n, m: n**m),
-  "/":         twoFnToTerm(lambda n, m: n/m),
-  "//":        twoFnToTerm(lambda n, m: n//m),
-  "%":         twoFnToTerm(lambda n, m: n % m),
-  "=":         twoFnToTerm(lambda n, m: n == m),
-  "<":         twoFnToTerm(lambda n, m: n < m),
-  "and":       twoFnToTerm(lambda n, m: n and m),
-  "or":        twoFnToTerm(lambda n, m: n or m),
-  "not":       fnToTerm(lambda n: not n),
-  "scottBool": fnToTerm(lambda n: exprStrToTerm("x -> y -> " + ("x" if n else "y"))()),
+  "true":      True,
+  "false":     False,
+  "atoi":      lambda s: int(s),
+  "+":         lambda n: lambda m: n+m,
+  "*":         lambda n: lambda m: n*m,
+  "**":        lambda n: lambda m: n**m,
+  "/":         lambda n: lambda m: n/m,
+  "//":        lambda n: lambda m: n//m,
+  "%":         lambda n: lambda m: n % m,
+  "=":         lambda n: lambda m: n == m,
+  "<":         lambda n: lambda m: n < m,
+  "and":       lambda n: lambda m: n and m,
+  "or":        lambda n: lambda m: n or m,
+  "not":       lambda n: not n,
+  "scottBool": lambda n: lambda x: lambda y: x() if n else y(),
+  "thunkify":  thunkify,
+  "force":     lambda f: f(),
 }
 
 def runCode(code):

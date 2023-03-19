@@ -2,7 +2,7 @@
 id := a -> a;
 const := a -> b -> a;
 ignore := a -> b -> b;
-fix := g -> (x -> g (x x)) (x -> g (x x));
+fix := f -> (x -> f (v -> x x v)) (x -> f (v -> x x v)); [Z combinator]
 compose := f -> g -> x -> f (g x);
 then := g -> f -> x -> f (g x);
 rev := x -> f -> f x;
@@ -10,17 +10,17 @@ rev2 := x -> y -> f -> f x y;
 if := scottBool;
 let := rev;
 
-constN := fix (self -> n -> x -> if (n `= atoi "0") x (const `$ self (n `+ atoi "-1") x));
-
-[symbols]
 $ := id;
 . := compose;
 & := then;
 
+constThunk := x -> thunkify (_ -> x);
+constN := fix (self -> n -> x -> if (n `= atoi "0") (constThunk x) (thunkify (_ -> (const `$ self (n `+ atoi "-1") x))));
+
 [maybe]
 just := a -> f -> x -> f a;
-nothing := f -> x -> x;
-fromMaybe := rev2 id;
+nothing := f -> x -> force x;
+fromMaybe := rev2 id `. constThunk;
 scottMaybe := id;
 
 [tuple]
@@ -33,25 +33,27 @@ scottTuple := id;
 left := x -> f -> g -> f x;
 right := x -> f -> g -> g x;
 scottEither := id;
+isLeft := rev2 (const true) (const false);
+isRight := not `. isLeft;
 leftToMaybe := rev2 just (const nothing);
 rightToMaybe := rev2 (const nothing) just;
 fromLeft := leftToMaybe `& fromMaybe "FAIL";
 fromRight := rightToMaybe `& fromMaybe "FAIL";
 
 [list]
-null := f -> x -> x;
+null := f -> x -> force x;
 cons := h -> t -> f -> x -> f h t;
-maybeHead := rev2 (h -> t -> just h) nothing;
-maybeTail := rev2 (h -> t -> just t) nothing;
+maybeHead := rev2 (h -> t -> just h) (constThunk nothing);
+maybeTail := rev2 (h -> t -> just t) (constThunk nothing);
 scottList := id;
-churchList := l -> f -> x -> fix (self -> l -> l (h -> t -> f h (self t)) x) l;
+churchList := l -> f -> x -> fix (self -> l -> l (h -> t -> f h (self t)) (constThunk x)) l;
 
 [list functions, but independent of impl]
 head := maybeHead `& fromMaybe "FAIL";
 tail := maybeTail `& fromMaybe "FAIL";
-reduce := f -> x -> l -> churchList l f x;
+reduce := f -> x -> l -> churchList l f (constThunk x);
 map := f -> reduce (f `& cons) null;
-filter := f -> reduce (h -> r -> if (f h) (cons h r) r) null;
+filter := f -> reduce (h -> r -> if (f h) (thunkify (_ -> cons h r)) (constThunk r)) null;
 len := reduce (h -> r -> r `+ atoi "1") (atoi "0");
 sum := reduce + (atoi "0");
 prod := reduce * (atoi "1");
@@ -70,27 +72,27 @@ scottDecl := scottTuple;
 
 [assumes we're at the top level (no free variables when we start); assumption is untrue when you add global vars TODO]
 subst := var -> sub -> fix (self -> expr -> scottExpr expr
-  [lambda s e] (s -> e -> lambda s `$ if (var `= s) e (self e) )
+  [lambda s e] (s -> e -> lambda s `$ if (var `= s) (constThunk e) (thunkify (_ -> self e)) )
   [app a b] (a -> b -> self a `app self b)
-  [var s] (s -> if (var `= s) sub expr )
+  [var s] (s -> if (var `= s) (constThunk sub) (constThunk expr) )
   [str _] (const expr)
   [builtin a strRepr appFn subFn] (a -> strRepr -> appFn -> subFn -> subFn var sub));
 
 stepExpr := fix (self -> expr -> scottExpr expr
   [lambda _ _] (constN (atoi "2") `$ false `tup expr)
   [app a b] (a -> b -> self a `let (aSimpl ->
-               if (fst aSimpl) (true `tup snd aSimpl `app b) (self b `let (bSimpl ->
-               if (fst bSimpl) (true `tup a `app snd bSimpl) ( scottExpr a
+               if (fst aSimpl) (thunkify (_ -> (true `tup snd aSimpl `app b))) (thunkify (_ -> (self b `let (bSimpl ->
+               if (fst bSimpl) (thunkify (_ -> (true `tup a `app snd bSimpl))) (thunkify (_ -> ( scottExpr a
                    [lambda s e] (s -> e -> true `tup subst s b e)
                    [app _ _] (constN (atoi "2") `$ false `tup a `app b)
                    [var _] (const `$ false `tup a `app b)
                    [str _] (const `$ false `tup a `app b)
-                   [builtin x strRepr appFn subFn] (x -> strRepr -> appFn -> subFn -> true `tup appFn b))))))
+                   [builtin x strRepr appFn subFn] (x -> strRepr -> appFn -> subFn -> true `tup appFn b))))))))))
   [var _] (const `$ false `tup expr)
   [str _] (const `$ false `tup expr)
   [builtin _ _ _ _] (constN (atoi "4") `$ false `tup expr));
 
-fullyEvalExpr := fix (self -> expr -> stepExpr expr `let (simpl -> if (fst simpl) (self `$ snd simpl) (snd simpl)));
+fullyEvalExpr := fix (self -> expr -> stepExpr expr `let (simpl -> if (fst simpl) (thunkify (_ -> (self `$ snd simpl))) (constThunk `$ snd simpl)));
 
 printExpr := fix (self -> expr -> scottExpr expr
   [lambda s e] (s -> e -> "(" `+ s `+ " -> " `+ self e `+ ")" )
@@ -98,6 +100,13 @@ printExpr := fix (self -> expr -> scottExpr expr
   [var s] (s -> s)
   [str s] (s -> "'" `+ s `+ "'") [ TODO should be double quote and escaped once python is fixed ]
   [builtin a strRepr appFn subFn] (a -> strRepr -> appFn -> subFn -> strRepr));
+
+[parser]
+
+[ parserRule = possibilities: list (thingsInPossibility: list (terminal:char | nonterminalIdx:int)) ]
+[ parserLang = list parserRule ]
+[ derivation = (ruleNumTaken:int, derivationsForNonterminals: list derivation) ]
+[ genParser: parserLang -> (strInp:string -> ( errStrIdx:int | derivation )) ]
 
 exampleLambdaTerm := ((lambda "x" `$ var "x") `app (lambda "x" `$ lambda "y" `$ var "y")) `app (str "q");
 
