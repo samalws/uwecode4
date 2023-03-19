@@ -40,6 +40,17 @@ rightToMaybe := rev2 (const nothing) just;
 fromLeft := leftToMaybe `& fromMaybe "FAIL";
 fromRight := rightToMaybe `& fromMaybe "FAIL";
 
+[nTup]
+nTup := "TODO";
+nTupNth := "TODO";
+
+[nSum]
+nSum := "TODO";
+nSumGetIdx := "TODO";
+nSumIsNth := "TODO";
+nSumGetNth := "TODO";
+fromNSum := "TODO";
+
 [list]
 null := f -> x -> force x;
 cons := h -> t -> f -> x -> f h t;
@@ -103,10 +114,29 @@ printExpr := fix (self -> expr -> scottExpr expr
 
 [parser]
 
-[ parserRule = possibilities: list (thingsInPossibility: list (terminal:char | nonterminalIdx:int)) ]
+[ symbol: terminal:char | nonterminalIdx: int ]
+[ parserRule = possibilities: list (thingsInPossibility: list symbol) ]
 [ parserLang = list parserRule ]
 [ derivation = (ruleNumTaken:int, derivationsForNonterminals: list derivation) ]
+[ parseTable = map (state:int,symbolOrEOF:maybe symbol) (accept:() | reduction:(amtToReduce:int, reduceToNonterminalIdx:int) | transition:int) ]
+[ parseState = (state:int, stack (cachedState:int, maybe derivation, symbol)) ]
+defaultParseState := atoi "0" `tup null;
+
+[ genParseTable: parserLang -> parseTable ]
+genParseTable = "TODO";
+
+[ runParseTable1: parseTable -> parseState -> maybe char -> either (success:bool) (newState:parseState) ]
+runParseTable1 := t -> st -> topChr -> scottTODO (mapLookup t (fst st `tup topChr)) [also theres the possibility you find Nothing lol]
+  (TODOthunkify? true)
+  (reductionInfo -> doReduction reductionInfo st)
+  (newStNum -> newStNum `tup push (newStNum `, nothing `, left (fromJust topChr)));
+
+[ runParseTable: parseTable -> strInp:string -> ( errStrIdx:int | derivation ) ]
+[BAD runParseTable := t -> fix (self -> state -> str -> scottEither (runParseTable1 t state (maybeHead str)) (TODO) (TODO) ) defaultParseState `. strToList;]
+[prob use reduce with a state of (str index,parseState) but my head hurts right now]
+
 [ genParser: parserLang -> (strInp:string -> ( errStrIdx:int | derivation )) ]
+genParser := runParseTable `. genParseTable;
 
 exampleLambdaTerm := ((lambda "x" `$ var "x") `app (lambda "x" `$ lambda "y" `$ var "y")) `app (str "q");
 
