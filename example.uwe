@@ -15,18 +15,25 @@ $ := id;
 & := then;
 
 neg := n -> n `* atoi "-1";
-
 constThunk := x -> thunkify (_ -> x);
 
-[ TODO write the derivations for these (I've tested them though) ]
+[n-functions]
 
 [constN 5 a b c d e f = a]
+[ const(N) x y ... = const(N-1) x ... ]
+[ const(N) x y = const(N-1) x ]
+[ const(N) x = const (const(N-1) x) ]
 constN := fix (self -> n -> x -> if (n `= atoi "0") (constThunk x) (thunkify (_ -> (const `$ self (n `+ atoi "-1") x))));
 
 [ignoreN 5 a b c d e f = f]
+[ ignore(N) x ... z = ignore(N-1) ... z ]
+[ ignore(N) x ... = ignore(N-1) ... ]
+[ ignore(N) x = ignore(N-1) ]
+[ ignore(N) = const ignore(N-1) ]
 ignoreN := fix (self -> n -> if (n `= atoi "0") (constThunk id) (thunkify (_ -> (const `$ self (n `+ atoi "-1")))));
 
 [composeN 5 f g a b c d e = f (g a b c d e)]
+[ compose(N) f g x ... = compose(N-1) f (g x) ... ]
 composeN := n -> f -> fix (self -> n -> g -> if (n `= atoi "0") (thunkify (_ -> f g)) (constThunk (x -> self (n `+ atoi "-1") (g x)))) n;
 
 [revN 5 a b c d e f = f a b c d e]
@@ -38,9 +45,10 @@ composeN := n -> f -> fix (self -> n -> g -> if (n `= atoi "0") (thunkify (_ -> 
 revN := fix (self -> n -> if (n `= atoi "0") (constThunk id) (constThunk (x -> composeN (n `+ atoi "-1") (& (rev x)) (self (n `+ atoi "-1")))));
 
 [nArgsPickMth 5 2 a b c d e = c]
-nArgsPickMth := n -> m -> composeN (m `+ atoi "1") (constN (n `+ neg m `+ atoi "-1")) (ignoreN m); [ TODO off by 1 error somewhere? ]
+nArgsPickMth := n -> m -> composeN (m `+ atoi "1") (constN (n `+ neg m `+ atoi "-1")) (ignoreN m);
 
 [applyN 5 x f = f x x x x x]
+[ apply(N) x f = apply(N) x (f x) ]
 applyN := n -> x -> fix (self -> n -> f -> if (n `= atoi "0") (constThunk f) (thunkify (_ -> self (n `+ atoi "-1") (f x)))) n;
 
 [maybe]
