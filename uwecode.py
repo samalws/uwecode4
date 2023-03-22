@@ -1,6 +1,6 @@
 tokens = ("VAR", "MIDVAR", "SEMI", "COLONEQUALS", "ARROW", "LPAREN", "RPAREN", "STRINGLIT")
 
-t_VAR = r'[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\'\<\>\,\.\/\?]+'
+t_VAR    =  r'[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\'\<\>\,\.\/\?]+'
 t_MIDVAR = r'`[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\'\<\>\,\.\/\?]+'
 t_SEMI = r';'
 t_COLONEQUALS = r':='
@@ -17,6 +17,7 @@ def t_newline(t):
 
 def t_comment(t):
   r'\[[^\]]*\]'
+  t.lexer.lineno += t.value.count("\n")
   pass
 
 def t_error(t):

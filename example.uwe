@@ -14,8 +14,34 @@ $ := id;
 . := compose;
 & := then;
 
+neg := n -> n `* atoi "-1";
+
 constThunk := x -> thunkify (_ -> x);
+
+[ TODO write the derivations for these (I've tested them though) ]
+
+[constN 5 a b c d e f = a]
 constN := fix (self -> n -> x -> if (n `= atoi "0") (constThunk x) (thunkify (_ -> (const `$ self (n `+ atoi "-1") x))));
+
+[ignoreN 5 a b c d e f = f]
+ignoreN := fix (self -> n -> if (n `= atoi "0") (constThunk id) (thunkify (_ -> (const `$ self (n `+ atoi "-1")))));
+
+[composeN 5 f g a b c d e = f (g a b c d e)]
+composeN := n -> f -> fix (self -> n -> g -> if (n `= atoi "0") (thunkify (_ -> f g)) (constThunk (x -> self (n `+ atoi "-1") (g x)))) n;
+
+[revN 5 a b c d e f = f a b c d e]
+[ rev(N) x ... f = rev(N-1) ... (f x) ]
+[ rev(N) x ... = rev(N-1) ... . (`$ x) ]
+[ rev(N) x ... = (`$ x) `& rev(N-1) ... ]
+[ rev(N) x = ((`$ x) `&) `(composeN N-1) rev(N-1) ]
+[ rev(N) x = (& (rev x)) `(composeN N-1) rev(N-1) ]
+revN := fix (self -> n -> if (n `= atoi "0") (constThunk id) (constThunk (x -> composeN (n `+ atoi "-1") (& (rev x)) (self (n `+ atoi "-1")))));
+
+[nArgsPickMth 5 2 a b c d e = c]
+nArgsPickMth := n -> m -> composeN (m `+ atoi "1") (constN (n `+ neg m `+ atoi "-1")) (ignoreN m); [ TODO off by 1 error somewhere? ]
+
+[applyN 5 x f = f x x x x x]
+applyN := n -> x -> fix (self -> n -> f -> if (n `= atoi "0") (constThunk f) (thunkify (_ -> self (n `+ atoi "-1") (f x)))) n;
 
 [maybe]
 just := a -> f -> x -> f a;
@@ -41,15 +67,20 @@ fromLeft := leftToMaybe `& fromMaybe "FAIL";
 fromRight := rightToMaybe `& fromMaybe "FAIL";
 
 [nTup]
-nTup := "TODO";
-nTupNth := "TODO";
+[ TODO use a tree structure for quicker lookup and assignment ]
+nTup := revN;
+nTupMth := n -> m -> rev `$ nArgsPickMth n m;
+nTupAssignMth := "TODO";
+scottNTup := const id;
 
 [nSum]
-nSum := "TODO";
-nSumGetIdx := "TODO";
-nSumIsNth := "TODO";
-nSumGetNth := "TODO";
-fromNSum := "TODO";
+[TODO these are untested]
+nSumMthCtor := n -> m -> x -> composeN n (rev x) (nArgsPickMth n m);
+nSumGetIdx := n -> fix (self -> m -> f -> if (n `= m) (constThunk f) (thunkify (_ -> self (n `+ atoi "1") (f `$ const m)))) (atoi "0");
+nSumIsMth := n -> m -> x -> nSumGetIdx n x `= m; [ TODO could in theory make more efficient but also who cares ]
+nSumGetVal := n -> applyN n id;
+nSumGetMth := n -> m -> x -> if (nSumIsMth n m x) (thunkify (_ -> nSumGetVal n x)) (constThunk nothing);
+scottNSum := const id;
 
 [list]
 null := f -> x -> force x;
@@ -123,7 +154,7 @@ printExpr := fix (self -> expr -> scottExpr expr
 defaultParseState := atoi "0" `tup null;
 
 [ genParseTable: parserLang -> parseTable ]
-genParseTable = "TODO";
+genParseTable := "TODO";
 
 [ runParseTable1: parseTable -> parseState -> maybe char -> either (success:bool) (newState:parseState) ]
 runParseTable1 := t -> st -> topChr -> scottTODO (mapLookup t (fst st `tup topChr)) [also theres the possibility you find Nothing lol]
