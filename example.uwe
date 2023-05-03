@@ -1,3 +1,9 @@
+0 := atoi "0";
+1 := atoi "1";
+2 := atoi "2";
+4 := atoi "4";
+n1 := atoi "-1";
+
 [basics]
 id := a -> a;
 const := a -> b -> a;
@@ -14,7 +20,7 @@ $ := id;
 . := compose;
 & := then;
 
-neg := n -> n `* atoi "-1";
+neg := n -> n `* n1;
 constThunk := x -> thunkify (_ -> x);
 
 [n-functions]
@@ -23,18 +29,18 @@ constThunk := x -> thunkify (_ -> x);
 [ const(N) x y ... = const(N-1) x ... ]
 [ const(N) x y = const(N-1) x ]
 [ const(N) x = const (const(N-1) x) ]
-constN := fix (self -> n -> x -> if (n `= atoi "0") (constThunk x) (thunkify (_ -> (const `$ self (n `+ atoi "-1") x))));
+constN := fix (self -> n -> x -> if (n `= 0) (constThunk x) (thunkify (_ -> (const `$ self (n `+ n1) x))));
 
 [ignoreN 5 a b c d e f = f]
 [ ignore(N) x ... z = ignore(N-1) ... z ]
 [ ignore(N) x ... = ignore(N-1) ... ]
 [ ignore(N) x = ignore(N-1) ]
 [ ignore(N) = const ignore(N-1) ]
-ignoreN := fix (self -> n -> if (n `= atoi "0") (constThunk id) (thunkify (_ -> (const `$ self (n `+ atoi "-1")))));
+ignoreN := fix (self -> n -> if (n `= 0) (constThunk id) (thunkify (_ -> (const `$ self (n `+ n1)))));
 
 [composeN 5 f g a b c d e = f (g a b c d e)]
 [ compose(N) f g x ... = compose(N-1) f (g x) ... ]
-composeN := n -> f -> fix (self -> n -> g -> if (n `= atoi "0") (thunkify (_ -> f g)) (constThunk (x -> self (n `+ atoi "-1") (g x)))) n;
+composeN := n -> f -> fix (self -> n -> g -> if (n `= 0) (thunkify (_ -> f g)) (constThunk (x -> self (n `+ n1) (g x)))) n;
 
 [revN 5 a b c d e f = f a b c d e]
 [ rev(N) x ... f = rev(N-1) ... (f x) ]
@@ -42,14 +48,14 @@ composeN := n -> f -> fix (self -> n -> g -> if (n `= atoi "0") (thunkify (_ -> 
 [ rev(N) x ... = (`$ x) `& rev(N-1) ... ]
 [ rev(N) x = ((`$ x) `&) `(composeN N-1) rev(N-1) ]
 [ rev(N) x = (& (rev x)) `(composeN N-1) rev(N-1) ]
-revN := fix (self -> n -> if (n `= atoi "0") (constThunk id) (constThunk (x -> composeN (n `+ atoi "-1") (& (rev x)) (self (n `+ atoi "-1")))));
+revN := fix (self -> n -> if (n `= 0) (constThunk id) (constThunk (x -> composeN (n `+ n1) (& (rev x)) (self (n `+ n1)))));
 
 [nArgsPickMth 5 2 a b c d e = c]
-nArgsPickMth := n -> m -> composeN (m `+ atoi "1") (constN (n `+ neg m `+ atoi "-1")) (ignoreN m);
+nArgsPickMth := n -> m -> composeN (m `+ 1) (constN (n `+ neg m `+ n1)) (ignoreN m);
 
 [applyN 5 x f = f x x x x x]
 [ apply(N) x f = apply(N) x (f x) ]
-applyN := n -> x -> fix (self -> n -> f -> if (n `= atoi "0") (constThunk f) (thunkify (_ -> self (n `+ atoi "-1") (f x)))) n;
+applyN := n -> x -> fix (self -> n -> f -> if (n `= 0) (constThunk f) (thunkify (_ -> self (n `+ n1) (f x)))) n;
 
 [maybe]
 just := a -> f -> x -> f a;
@@ -84,7 +90,7 @@ scottNTup := const id;
 [nSum]
 [TODO these are untested]
 nSumMthCtor := n -> m -> x -> composeN n (rev x) (nArgsPickMth n m);
-nSumGetIdx := n -> fix (self -> m -> f -> if (n `= m) (constThunk f) (thunkify (_ -> self (n `+ atoi "1") (f `$ const m)))) (atoi "0");
+nSumGetIdx := n -> fix (self -> m -> f -> if (n `= m) (constThunk f) (thunkify (_ -> self (n `+ 1) (f `$ const m)))) 0;
 nSumIsMth := n -> m -> x -> nSumGetIdx n x `= m; [ TODO could in theory make more efficient but also who cares ]
 nSumGetVal := n -> applyN n id;
 nSumGetMth := n -> m -> x -> if (nSumIsMth n m x) (thunkify (_ -> nSumGetVal n x)) (constThunk nothing);
@@ -96,7 +102,7 @@ cons := h -> t -> f -> x -> f h t;
 maybeHead := rev2 (h -> t -> just h) (constThunk nothing);
 maybeTail := rev2 (h -> t -> just t) (constThunk nothing);
 scottList := id;
-churchList := l -> f -> x -> fix (self -> l -> l (h -> t -> f h (self t)) (constThunk x)) l;
+churchList := l -> f -> x -> fix (self -> l -> l (h -> t -> f h (self t)) x) l;
 
 [list functions, but independent of impl]
 head := maybeHead `& fromMaybe "FAIL";
@@ -104,9 +110,9 @@ tail := maybeTail `& fromMaybe "FAIL";
 reduce := f -> x -> l -> churchList l f (constThunk x);
 map := f -> reduce (f `& cons) null;
 filter := f -> reduce (h -> r -> if (f h) (thunkify (_ -> cons h r)) (constThunk r)) null;
-len := reduce (h -> r -> r `+ atoi "1") (atoi "0");
-sum := reduce + (atoi "0");
-prod := reduce * (atoi "1");
+len := reduce (h -> r -> r `+ 1) 0;
+sum := reduce + 0;
+prod := reduce * 1;
 
 [uwecode repr]
 [expr = lambda string expr | app expr expr | var string | str string | builtin a string appFn:(expr -> expr) subFn:(string -> expr -> expr) ]
@@ -129,18 +135,18 @@ subst := var -> sub -> fix (self -> expr -> scottExpr expr
   [builtin a strRepr appFn subFn] (a -> strRepr -> appFn -> subFn -> subFn var sub));
 
 stepExpr := fix (self -> expr -> scottExpr expr
-  [lambda _ _] (constN (atoi "2") `$ false `tup expr)
+  [lambda _ _] (constN 2 `$ false `tup expr)
   [app a b] (a -> b -> self a `let (aSimpl ->
                if (fst aSimpl) (thunkify (_ -> (true `tup snd aSimpl `app b))) (thunkify (_ -> (self b `let (bSimpl ->
                if (fst bSimpl) (thunkify (_ -> (true `tup a `app snd bSimpl))) (thunkify (_ -> ( scottExpr a
                    [lambda s e] (s -> e -> true `tup subst s b e)
-                   [app _ _] (constN (atoi "2") `$ false `tup a `app b)
+                   [app _ _] (constN 2 `$ false `tup a `app b)
                    [var _] (const `$ false `tup a `app b)
                    [str _] (const `$ false `tup a `app b)
                    [builtin x strRepr appFn subFn] (x -> strRepr -> appFn -> subFn -> true `tup appFn b))))))))))
   [var _] (const `$ false `tup expr)
   [str _] (const `$ false `tup expr)
-  [builtin _ _ _ _] (constN (atoi "4") `$ false `tup expr));
+  [builtin _ _ _ _] (constN 4 `$ false `tup expr));
 
 fullyEvalExpr := fix (self -> expr -> stepExpr expr `let (simpl -> if (fst simpl) (thunkify (_ -> (self `$ snd simpl))) (constThunk `$ snd simpl)));
 
@@ -153,30 +159,22 @@ printExpr := fix (self -> expr -> scottExpr expr
 
 [parser]
 
-[ symbol: terminal:char | nonterminalIdx: int ]
-[ parserRule = possibilities: list (thingsInPossibility: list symbol) ]
-[ parserLang = list parserRule ]
-[ derivation = (ruleNumTaken:int, derivationsForNonterminals: list derivation) ]
-[ parseTable = map (state:int,symbolOrEOF:maybe symbol) (accept:() | reduction:(amtToReduce:int, reduceToNonterminalIdx:int) | transition:int) ]
-[ parseState = (state:int, stack (cachedState:int, maybe derivation, symbol)) ]
-defaultParseState := atoi "0" `tup null;
+[parser x = string -> maybe (x, string)]
 
-[ genParseTable: parserLang -> parseTable ]
-genParseTable := "TODO";
+stringHead := s -> substring s 0 1;
+stringTail := s -> substring s 1 (strlen s);
 
-[ runParseTable1: parseTable -> parseState -> maybe char -> either (success:bool) (newState:parseState) ]
-runParseTable1 := t -> st -> topChr -> scottTODO (mapLookup t (fst st `tup topChr)) [also theres the possibility you find Nothing lol]
-  (TODOthunkify? true)
-  (reductionInfo -> doReduction reductionInfo st)
-  (newStNum -> newStNum `tup push (newStNum `, nothing `, left (fromJust topChr)));
+parseCharSat := cf -> s -> if (s `= "") (constThunk nothing) `$ thunkify (_ -> stringHead s `let (strHead -> if (cf strHead) (thunkify (_ -> (just (strHead `tup stringTail s)))) (constThunk nothing)));
+parseChar    := c -> parseCharSat (= c);
+parsePure    := x -> s -> just (force x `tup s);
+parseMap     := f -> p -> s -> scottMaybe (p s) (v -> just (f (fst v) `tup snd v)) (constThunk nothing);
+parseApp     := pf -> px -> s -> scottMaybe (pf s) (f -> scottMaybe (px `$ snd f) (x -> just (fst f (fst x) `tup snd x)) (constThunk nothing)) (constThunk nothing);
+parseBind    := pa -> fb -> s -> scottMaybe (pa s) (a -> fb (fst a) (snd a)) (constThunk nothing);
+parseThen    := pa -> pb -> parseBind pa (const pb);
+parseOr      := pa -> pb -> s -> scottMaybe (pa s) just (thunkify (_ -> pb s));
+parseMany    := p -> fix (self -> ((cons `parseMap p) `parseApp self) `parseOr parsePure (constThunk null));
+parseManyOne := p -> (cons `parseMap p) `parseApp parseMany p;
 
-[ runParseTable: parseTable -> strInp:string -> ( errStrIdx:int | derivation ) ]
-[BAD runParseTable := t -> fix (self -> state -> str -> scottEither (runParseTable1 t state (maybeHead str)) (TODO) (TODO) ) defaultParseState `. strToList;]
-[prob use reduce with a state of (str index,parseState) but my head hurts right now]
+sumList := reduce + "";
 
-[ genParser: parserLang -> (strInp:string -> ( errStrIdx:int | derivation )) ]
-genParser := runParseTable `. genParseTable;
-
-exampleLambdaTerm := ((lambda "x" `$ var "x") `app (lambda "x" `$ lambda "y" `$ var "y")) `app (str "q");
-
-main := printExpr `$ fullyEvalExpr exampleLambdaTerm;
+main := scottMaybe ((parseMany `$ parseChar "q") "qqqqqqqqqqqya") (sumList `. fst) (constThunk "fail");

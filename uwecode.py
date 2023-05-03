@@ -146,6 +146,8 @@ toFeed = {
   "or":        lambda n: lambda m: n or m,
   "not":       lambda n: not n,
   "scottBool": lambda n: lambda x: lambda y: x() if n else y(),
+  "substring": lambda s: lambda n: lambda m: s[n:m],
+  "strlen":    lambda s: len(s),
   "thunkify":  thunkify,
   "force":     lambda f: f(),
 }
