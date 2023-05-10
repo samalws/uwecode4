@@ -1,3 +1,6 @@
+import sys
+sys.setrecursionlimit(100000)
+
 tokens = ("VAR", "MIDVAR", "SEMI", "COLONEQUALS", "ARROW", "LPAREN", "RPAREN", "STRINGLIT")
 
 t_VAR    =  r'[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\'\<\>\,\.\/\?]+'
@@ -131,29 +134,32 @@ def thunkify(exprLambda): # exprLambda: _ -> val
   return lambda: retVal(tbl)
 
 toFeed = {
-  "true":      True,
-  "false":     False,
-  "atoi":      lambda s: int(s),
-  "+":         lambda n: lambda m: n+m,
-  "*":         lambda n: lambda m: n*m,
-  "**":        lambda n: lambda m: n**m,
-  "/":         lambda n: lambda m: n/m,
-  "//":        lambda n: lambda m: n//m,
-  "%":         lambda n: lambda m: n % m,
-  "=":         lambda n: lambda m: n == m,
-  "<":         lambda n: lambda m: n < m,
-  "and":       lambda n: lambda m: n and m,
-  "or":        lambda n: lambda m: n or m,
-  "not":       lambda n: not n,
-  "scottBool": lambda n: lambda x: lambda y: x() if n else y(),
-  "substring": lambda s: lambda n: lambda m: s[n:m],
-  "strlen":    lambda s: len(s),
-  "thunkify":  thunkify,
-  "force":     lambda f: f(),
+  "true":        True,
+  "false":       False,
+  "atoi":        lambda s: int(s),
+  "+":           lambda n: lambda m: n+m,
+  "*":           lambda n: lambda m: n*m,
+  "**":          lambda n: lambda m: n**m,
+  "/":           lambda n: lambda m: n/m,
+  "//":          lambda n: lambda m: n//m,
+  "%":           lambda n: lambda m: n % m,
+  "=":           lambda n: lambda m: n == m,
+  "<":           lambda n: lambda m: n < m,
+  "and":         lambda n: lambda m: n and m,
+  "or":          lambda n: lambda m: n or m,
+  "not":         lambda n: not n,
+  "scottBool":   lambda n: lambda x: lambda y: x() if n else y(),
+  "substring":   lambda s: lambda n: lambda m: s[n:m],
+  "strlen":      lambda s: len(s),
+  "strfind":     lambda s: lambda c: s.find(c),
+  "doubleQuote": '"',
+  "newline":     '\n',
+  "thunkify":    thunkify,
+  "force":       lambda f: f(),
 }
 
 def runCode(code):
-  main = codeStrToTerm(code, toFeed)
+  main = codeStrToTerm(code, toFeed) # TODO should feed arguments until it has a valid form, so that (x -> "asdf" x) is the same as "asdf"
   print(main)
 
 runCode(open("example.uwe","r").read())
