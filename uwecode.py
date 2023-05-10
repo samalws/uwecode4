@@ -152,6 +152,7 @@ toFeed = {
   "substring":   lambda s: lambda n: lambda m: s[n:m],
   "strlen":      lambda s: len(s),
   "strfind":     lambda s: lambda c: s.find(c),
+  "strreplace":  lambda a: lambda b: lambda s: s.replace(a,b),
   "doubleQuote": '"',
   "newline":     '\n',
   "thunkify":    thunkify,

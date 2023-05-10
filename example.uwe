@@ -117,6 +117,18 @@ sum := reduce + 0;
 prod := reduce * 1;
 isNull := l -> scottList l (const false) (constThunk true);
 
+foldr := reduce;
+foldrNonempty := f -> l -> foldr f (head l) (tail l);
+foldl := f -> fix (self -> x -> l -> scottList l (h -> t -> self (f x h) t) (constThunk x));
+foldlNonempty := f -> l -> foldl f (head l) (tail l);
+
+[string utils]
+
+stringHead := s -> substring s 0 1;
+stringTail := s -> substring s 1 (strlen s);
+stringToList := fix (self -> s -> if (strlen s `= 0) (constThunk null) (thunkify (_ -> stringHead s `cons self (stringTail s))));
+charInString := s -> c -> not `$ (s `strfind c) `= n1;
+
 [uwecode repr]
 [expr = lambda string expr | app expr expr | var string | str string | builtin a string appFn:(expr -> expr) subFn:(string -> expr -> expr) ]
 [decl = (string, expr)]
@@ -160,18 +172,6 @@ printExpr := fix (self -> expr -> scottExpr expr
   [str s] (s -> doubleQuote `+ s `+ doubleQuote)
   [builtin a strRepr appFn subFn] (a -> strRepr -> appFn -> subFn -> strRepr));
 
-[temp jank]
-
-stringHead := s -> substring s 0 1;
-stringTail := s -> substring s 1 (strlen s);
-stringToList := fix (self -> s -> if (strlen s `= 0) (constThunk null) (thunkify (_ -> stringHead s `cons self (stringTail s))));
-[charInString := s -> c -> fix (self -> s -> if (strlen s `= 0) (constThunk false) (thunkify (_ -> if (stringHead s `= c) (constThunk true) (thunkify (_ -> self `$ stringTail s))))) s;]
-charInString := s -> c -> not `$ (s `strfind c) `= n1;
-
-[foldl := f -> fix (self -> x -> l -> if (isNull l) (constThunk x) (thunkify (_ -> self (x `f head l) (tail l))));]
-foldl := f -> fix (self -> x -> l -> scottList l (h -> t -> self (f x h) t) (constThunk x));
-foldlNonempty := f -> l -> foldl f (head l) (tail l);
-
 [parser]
 
 [parser x = string -> maybe (x, string)]
@@ -194,17 +194,14 @@ parseTup          := pa -> pb -> (tup `parseMap pa) `parseApp pb;
 parseManyOneDelim := p -> pd -> fix (self -> ((cons `parseMap p `parseThenL pd) `parseApp self) `parseOr parseMap singleton p);
 
 [parser for uwecode]
-[ TODO parseVar and parseMidVar should also have ' in the list, took out for temp string lits ]
-[parseVar := parseCharsSat `$ charInString "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890!@#$%^&*+=_|'<>,./?";
-parseMidVar := parseChar "`" `parseThen parseCharsSat `$ charInString "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890!@#$%^&*+=_|'<>,./?";]
-parseVar := parseCharsSat `$ charInString "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890!@#$%^&*+=_|<>,./?";
-parseMidVar := parseChar "`" `parseThen parseCharsSat `$ charInString "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890!@#$%^&*+=_|<>,./?";
+parseVar := parseCharsSat `$ charInString "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890!@#$%^&*+=_|'<>,./?";
+parseMidVar := parseChar "`" `parseThen parseCharsSat `$ charInString "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890!@#$%^&*+=_|'<>,./?";
 parseSemi := parseChar ";";
 parseColonEquals := parseString ":=";
 parseArrow := parseString "->";
 parseLParen := parseChar "(";
 parseRParen := parseChar ")";
-parseStringLit := parseChar "'" [doubleQuote] `parseThen parseCharsSat (not `. = "'" [doubleQuote]) `parseThenL parseChar "'" [doubleQuote];
+parseStringLit := parseChar doubleQuote `parseThen parseCharsSat (not `. = doubleQuote) `parseThenL parseChar doubleQuote;
 parseOneWhitespace := parseCharSat `$ charInString (" 	" `+ newline);
 parseMaybeWhitespace := parseMany parseOneWhitespace;
 parseWhitespace := parseManyOne parseOneWhitespace;
@@ -212,23 +209,21 @@ parseWhitespace := parseManyOne parseOneWhitespace;
 thenMW := p -> p `parseThenL parseMaybeWhitespace;
 
 makeParseLam := parseExpr -> (lambda `parseMap thenMW parseVar `parseThenL thenMW parseArrow) `parseApp parseExpr;
-[makeParseExpr1] parseExpr1 := [parseExpr -> parseExpr2 ->] s -> (makeParseLam parseExpr `parseOr parseExpr2) s;
+makeParseExpr1 := parseExpr -> parseExpr2 -> makeParseLam parseExpr `parseOr parseExpr2;
 
-makeParseMidapp := parseExpr2 -> parseExpr3 -> s -> ((((a -> b -> c -> (var b `app a) `app c) `parseMap thenMW parseExpr3) `parseApp thenMW parseMidVar) `parseApp parseExpr2) s;
-[makeParseExpr2] parseExpr2_ := [parseExpr2 -> parseExpr3 ->] s -> (makeParseMidapp parseExpr2 parseExpr3 `parseOr parseExpr3) s;
+makeParseExpr2 := parseExpr2 -> parseExpr3 -> parseExpr3 `parseBind (a -> (((b -> c -> (var b `app a) `app c) `parseMap parseMaybeWhitespace `parseThen thenMW parseMidVar) `parseApp parseExpr2) `parseOr parsePure (constThunk a));
 
-parseExpr2 := s -> (parseExpr3 `parseBind (a -> (((b -> c -> (var b `app a) `app c) `parseMap parseMaybeWhitespace `parseThen thenMW parseMidVar) `parseApp parseExpr2) `parseOr parsePure (constThunk a))) s;
-
-[makeParseExpr3] parseExpr3 := [parseExpr4 ->] s -> (foldlNonempty app `parseMap parseManyOneDelim parseExpr4 parseMaybeWhitespace) s;
+makeParseExpr3 := parseExpr4 -> foldlNonempty app `parseMap parseManyOneDelim parseExpr4 parseMaybeWhitespace;
 
 parseVarExpr := var `parseMap parseVar;
 makeParseParenExpr := parseExpr -> thenMW parseLParen `parseThen thenMW parseExpr `parseThenL parseRParen;
 parseStringLitExpr := str `parseMap parseStringLit;
-[makeParseExpr4] parseExpr4 := [parseExpr ->] s -> (parseVarExpr `parseOr makeParseParenExpr parseExpr `parseOr parseStringLitExpr) s;
+makeParseExpr4 := parseExpr -> parseVarExpr `parseOr makeParseParenExpr parseExpr `parseOr parseStringLitExpr;
 
-parseExpr := parseExpr1; [fix (self -> s -> (fst (fst self) `let (e1 -> snd (fst self) `let (e2 -> fst (snd self) `let (e3 -> snd (snd self) `let (e4 -> (makeParseExpr1 e1 e2 `tup makeParseExpr2 e2 e3) `tup (makeParseExpr3 e4 `tup makeParseExpr4 e1)))))) s);]
+makeParseExpr1_ := es -> s -> es (e1 -> e2 -> e3 -> e4 -> makeParseExpr1 e1 e2 s);
+makeParseExpr2_ := es -> s -> es (e1 -> e2 -> e3 -> e4 -> makeParseExpr2 e2 e3 s);
+makeParseExpr3_ := es -> s -> es (e1 -> e2 -> e3 -> e4 -> makeParseExpr3 e4 s);
+makeParseExpr4_ := es -> s -> es (e1 -> e2 -> e3 -> e4 -> makeParseExpr4 e1 s);
+parseExpr := fix (es -> f -> f (makeParseExpr1_ es) (makeParseExpr2_ es) (makeParseExpr3_ es) (makeParseExpr4_ es)) (e1 -> e2 -> e3 -> e4 -> s -> e1 s);
 
-[main := scottMaybe (makeParseParenExpr parseExpr "((((( x )))))") (printExpr `. fst) (constThunk "fail"); WORKS]
-[main := scottMaybe (parseExpr "x `y z `a b") (printExpr `. fst) (constThunk "fail"); WORKS]
-[main := scottMaybe (parseExpr "x -> y") (printExpr `. fst) (constThunk "fail"); WORKS]
-main := scottMaybe (parseExpr "((x)) `y (z -> a `b c `d e `f 'g' 'h' (i))") (printExpr `. fst) (constThunk "fail");
+main := scottMaybe (parseExpr `$ strreplace "'" doubleQuote "((x)) `y (z -> a `b c `d e `f 'g' 'h' (i))") (printExpr `. fst) (constThunk "fail");
