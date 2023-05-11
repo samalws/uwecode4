@@ -226,4 +226,6 @@ makeParseExpr3_ := es -> s -> es (e1 -> e2 -> e3 -> e4 -> makeParseExpr3 e4 s);
 makeParseExpr4_ := es -> s -> es (e1 -> e2 -> e3 -> e4 -> makeParseExpr4 e1 s);
 parseExpr := fix (es -> f -> f (makeParseExpr1_ es) (makeParseExpr2_ es) (makeParseExpr3_ es) (makeParseExpr4_ es)) (e1 -> e2 -> e3 -> e4 -> s -> e1 s);
 
-main := scottMaybe (parseExpr `$ strreplace "'" doubleQuote "((x)) `y (z -> a `b c `d e `f 'g' 'h' (i))") (printExpr `. fst) (constThunk "fail");
+parseSimplAndStringify := s -> scottMaybe (parseExpr `$ strreplace "'" doubleQuote s) (printExpr `. fullyEvalExpr `. fst) (constThunk "fail");
+
+main := parseSimplAndStringify "(a -> b -> c -> b a) 'hello' (x -> x) 'abc'";
