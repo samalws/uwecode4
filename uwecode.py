@@ -1,7 +1,7 @@
 import sys
 sys.setrecursionlimit(100000)
 
-tokens = ("VAR", "MIDVAR", "SEMI", "COLONEQUALS", "ARROW", "LPAREN", "RPAREN", "STRINGLIT")
+tokens = ("VAR", "MIDVAR", "SEMI", "COLONEQUALS", "ARROW", "LPAREN", "RPAREN", "STRINGLIT", "LBRACKET", "RBRACKET")
 
 t_VAR    =  r'[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\'\<\>\,\.\/\?]+'
 t_MIDVAR = r'`[a-zA-Z0-9\!\@\#\$\%\^\&\*\+\=\_\|\'\<\>\,\.\/\?]+'
@@ -11,6 +11,8 @@ t_ARROW = r'->'
 t_LPAREN = r'\('
 t_RPAREN = r'\)'
 t_STRINGLIT = r'"[^"]*"'
+t_LBRACKET = r'\{'
+t_RBRACKET = r'\}'
 
 t_ignore = " \t"
 
@@ -98,6 +100,35 @@ def p_lvl4expr_parens(t):
   'lvl4expr : LPAREN expr RPAREN'
   t[0] = t[2]
 
+def p_undefined(t):
+  'lvl4expr : LPAREN RPAREN'
+  def undef(x):
+    print("UNDEFINED CALLED")
+    exit(1)
+  t[0] = lambda m: undef
+
+def thunkify(exprLambda): # exprLambda: _ -> val
+  tbl = { "status": 0, "result": None }
+  # status:
+  # 0: never evalled yet
+  # 1: in process of evalling
+  # 2: have a result
+  def retVal(tbl):
+    status = tbl["status"]
+    if status == 0:
+      status = 1
+      tbl["result"] = exprLambda(())
+      tbl["status"] = 2
+    elif status == 1:
+      raise Exception("Infinite loop")
+    return tbl["result"]
+  return lambda u: retVal(tbl)
+
+def p_lvl4expr_brackets(t):
+  'lvl4expr : LBRACKET expr RBRACKET'
+  t2 = t[2]
+  t[0] = lambda m: thunkify(lambda u: t2(m))
+
 def p_lvl4expr_string(t):
   'lvl4expr : STRINGLIT'
   t1 = t[1]
@@ -116,23 +147,6 @@ def codeStrToTerm(s,m,mainFn="main"):
   for defn in parsed: defn(m)
   return m[mainFn]
 
-def thunkify(exprLambda): # exprLambda: _ -> val
-  tbl = { "status": 0, "result": None }
-  # status:
-  # 0: never evalled yet
-  # 1: in process of evalling
-  # 2: have a result
-  def retVal(tbl):
-    status = tbl["status"]
-    if status == 0:
-      status = 1
-      tbl["result"] = exprLambda(())
-      tbl["status"] = 2
-    elif status == 1:
-      raise Exception("Infinite loop")
-    return tbl["result"]
-  return lambda: retVal(tbl)
-
 toFeed = {
   "true":        True,
   "false":       False,
@@ -148,15 +162,13 @@ toFeed = {
   "and":         lambda n: lambda m: n and m,
   "or":          lambda n: lambda m: n or m,
   "not":         lambda n: not n,
-  "scottBool":   lambda n: lambda x: lambda y: x() if n else y(),
+  "scottBool":   lambda n: lambda x: lambda y: x(()) if n else y(()),
   "substring":   lambda s: lambda n: lambda m: s[n:m],
   "strlen":      lambda s: len(s),
   "strfind":     lambda s: lambda c: s.find(c),
   "strreplace":  lambda a: lambda b: lambda s: s.replace(a,b),
   "doubleQuote": '"',
   "newline":     '\n',
-  "thunkify":    thunkify,
-  "force":       lambda f: f(),
 }
 
 def runCode(code):
