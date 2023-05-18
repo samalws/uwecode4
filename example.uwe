@@ -129,13 +129,15 @@ stringToList := fix (self -> s -> if (strlen s `= 0) {null} {stringHead s `cons 
 charInString := s -> c -> not `$ (s `strfind c) `= n1;
 
 [uwecode repr]
-[expr = lambda string expr | app expr expr | var string | str string | builtin a string appFn:(expr -> expr) subFn:(string -> expr -> expr) ]
+[expr = lambda string expr | app expr expr | var string | str string | thunk expr | undefined | builtin a string appFn:(expr -> expr) subFn:(string -> expr -> expr) ]
 [decl = (string, expr)]
-lambda := s -> e -> f -> g -> h -> i -> j -> f s e;
-app := a -> b -> f -> g -> h -> i -> j -> g a b;
-var := s -> f -> g -> h -> i -> j -> h s;
-str := s -> f -> g -> h -> i -> j -> i s;
-builtin := a -> strRepr -> appFn -> subFn -> f -> g -> h -> i -> j -> j a strRepr appFn subFn;
+lambda := s -> e -> f -> g -> h -> i -> j -> k -> l -> f s e;
+app := a -> b -> f -> g -> h -> i -> j -> k -> l -> g a b;
+var := s -> f -> g -> h -> i -> j -> k -> l -> h s;
+str := s -> f -> g -> h -> i -> j -> k -> l -> i s;
+thunk := a -> f -> g -> h -> i -> j -> k -> l -> j a;
+undefined := f -> g -> h -> i -> j -> k -> l -> k ();
+builtin := a -> strRepr -> appFn -> subFn -> f -> g -> h -> i -> j -> k -> l -> l a strRepr appFn subFn;
 decl := tup;
 scottExpr := id;
 scottDecl := scottTuple;
@@ -146,6 +148,8 @@ subst := var -> sub -> fix (self -> expr -> scottExpr expr
   [app a b] (a -> b -> self a `app self b)
   [var s] (s -> if (var `= s) {sub} {expr} )
   [str _] (const expr)
+  [thunk a] (a -> thunk `$ self a)
+  [undefined] {expr}
   [builtin a strRepr appFn subFn] (a -> strRepr -> appFn -> subFn -> subFn var sub));
 
 stepExpr := fix (self -> expr -> scottExpr expr
@@ -157,9 +161,13 @@ stepExpr := fix (self -> expr -> scottExpr expr
                    [app _ _] (constN 2 `$ false `tup a `app b)
                    [var _] (const `$ false `tup a `app b)
                    [str _] (const `$ false `tup a `app b)
+                   [thunk a] (a -> true `tup a) [TODO]
+                   [undefined] {undefined}
                    [builtin x strRepr appFn subFn] (x -> strRepr -> appFn -> subFn -> true `tup appFn b)})}))
   [var _] (const `$ false `tup expr)
   [str _] (const `$ false `tup expr)
+  [thunk a] (a -> self a `let (aSimpl -> fst aSimpl `tup thunk (snd aSimpl)))
+  [undefined] {false `tup expr}
   [builtin _ _ _ _] (constN 4 `$ false `tup expr));
 
 fullyEvalExpr := fix (self -> expr -> stepExpr expr `let (simpl -> if (fst simpl) {self `$ snd simpl} {snd simpl}));
@@ -169,6 +177,8 @@ printExpr := fix (self -> expr -> scottExpr expr
   [app a b] (a -> b -> "(" `+ self a `+ " " `+ self b `+ ")" )
   [var s] (s -> s)
   [str s] (s -> doubleQuote `+ s `+ doubleQuote)
+  [thunk a] (a -> "{" `+ self a `+ "}")
+  [undefined] {"()"}
   [builtin a strRepr appFn subFn] (a -> strRepr -> appFn -> subFn -> strRepr));
 
 [parser]
@@ -200,6 +210,8 @@ parseColonEquals := parseString ":=";
 parseArrow := parseString "->";
 parseLParen := parseChar "(";
 parseRParen := parseChar ")";
+parseLBracket := parseChar "{";
+parseRBracket := parseChar "}";
 parseStringLit := parseChar doubleQuote `parseThen parseCharsSat (not `. = doubleQuote) `parseThenL parseChar doubleQuote;
 parseOneWhitespace := parseCharSat `$ charInString (" 	" `+ newline);
 parseMaybeWhitespace := parseMany parseOneWhitespace;
@@ -216,8 +228,10 @@ makeParseExpr3 := parseExpr4 -> foldlNonempty app `parseMap parseManyOneDelim pa
 
 parseVarExpr := var `parseMap parseVar;
 makeParseParenExpr := parseExpr -> thenMW parseLParen `parseThen thenMW parseExpr `parseThenL parseRParen;
+parseUndefinedExpr := thenMW parseLParen `parseThen parseRParen `parseThen parsePure {undefined};
+makeThunkExpr := parseExpr -> thenMW parseLBracket `parseThen thenMW (thunk `parseMap parseExpr) `parseThenL parseRBracket;
 parseStringLitExpr := str `parseMap parseStringLit;
-makeParseExpr4 := parseExpr -> parseVarExpr `parseOr makeParseParenExpr parseExpr `parseOr parseStringLitExpr;
+makeParseExpr4 := parseExpr -> parseVarExpr `parseOr makeParseParenExpr parseExpr `parseOr parseUndefinedExpr `parseOr makeThunkExpr parseExpr `parseOr parseStringLitExpr;
 
 makeParseExpr1_ := es -> s -> es (e1 -> e2 -> e3 -> e4 -> makeParseExpr1 e1 e2 s);
 makeParseExpr2_ := es -> s -> es (e1 -> e2 -> e3 -> e4 -> makeParseExpr2 e2 e3 s);
@@ -227,4 +241,4 @@ parseExpr := fix (es -> f -> f (makeParseExpr1_ es) (makeParseExpr2_ es) (makePa
 
 parseSimplAndStringify := s -> scottMaybe (parseExpr `$ strreplace "'" doubleQuote s) (printExpr `. fullyEvalExpr `. fst) {"fail"};
 
-main := parseSimplAndStringify "(a -> b -> c -> b a) 'hello' (x -> x) 'abc'";
+main := parseSimplAndStringify "(a -> b -> c -> b a) ({'hello'} ()) (x -> x) 'abc'";

@@ -100,11 +100,11 @@ def p_lvl4expr_parens(t):
   'lvl4expr : LPAREN expr RPAREN'
   t[0] = t[2]
 
+def undef(x):
+  return undef
+
 def p_undefined(t):
   'lvl4expr : LPAREN RPAREN'
-  def undef(x):
-    print("UNDEFINED CALLED")
-    exit(1)
   t[0] = lambda m: undef
 
 def thunkify(exprLambda): # exprLambda: _ -> val
